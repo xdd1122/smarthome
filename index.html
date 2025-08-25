@@ -1,49 +1,128 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>Weather & Calendar Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 30px;
+      background-color: #f0f2f5;
+    }
+    h1 {
+      color: #333;
+    }
+    #weather {
+      padding: 10px;
+      background-color: #fff;
+      border-radius: 8px;
+      width: 300px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    #calendar {
+      padding: 10px;
+      background-color: #fff;
+      border-radius: 8px;
+      width: 400px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    input, button {
+      padding: 8px;
+      margin: 5px 0;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+    button {
+      cursor: pointer;
+      background-color: #0078D4;
+      color: white;
+      border: none;
+    }
+    ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    li {
+      background: #e0e0e0;
+      padding: 5px 10px;
+      border-radius: 4px;
+      margin-bottom: 5px;
+    }
+  </style>
 </head>
 <body>
   <h1>Weather Dashboard</h1>
-  <div id="weather"></div>
+  <div id="weather">Loading weather...</div>
 
   <h1>Calendar Events</h1>
-  <input type="date" id="date" />
-  <input type="text" id="desc" placeholder="Event description"/>
-  <button onclick="addEvent()">Add Event</button>
-  <ul id="events"></ul>
+  <div id="calendar">
+    <input type="date" id="date" />
+    <input type="text" id="desc" placeholder="Event description"/>
+    <button onclick="addEvent()">Add Event</button>
+    <ul id="events"></ul>
+  </div>
 
   <script>
+    // Load weather data from Python backend
     async function loadWeather() {
-      const res = await fetch('/weather');
-      const data = await res.json();
-      document.getElementById('weather').innerText =
-        `${data.name}: ${data.main.temp}°C, ${data.weather[0].description}`;
+      try {
+        const res = await fetch('/weather');
+        const data = await res.json();
+        document.getElementById('weather').innerText =
+          `${data.name}: ${data.temp}°C, ${data.description}`;
+      } catch (err) {
+        document.getElementById('weather').innerText = "Failed to load weather.";
+        console.error(err);
+      }
     }
 
+    // Add new calendar event
     async function addEvent() {
       const date = document.getElementById('date').value;
-      const desc = document.getElementById('desc').value;
-      await fetch('/addEvent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, description: desc })
-      });
-      loadEvents(date);
+      const desc = document.getElementById('desc').value.trim();
+      if (!date || !desc) {
+        alert("Please select a date and enter a description.");
+        return;
+      }
+      try {
+        await fetch('/addEvent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: date, description: desc })
+        });
+        document.getElementById('desc').value = "";
+        loadEvents(date);
+      } catch (err) {
+        console.error(err);
+        alert("Failed to add event.");
+      }
     }
 
+    // Load events for a specific date
     async function loadEvents(date) {
-      const res = await fetch(`/events?date=${date}`);
-      const events = await res.json();
-      const list = document.getElementById('events');
-      list.innerHTML = "";
-      events.forEach(e => {
-        const li = document.createElement('li');
-        li.innerText = e.description;
-        list.appendChild(li);
-      });
+      if (!date) return;
+      try {
+        const res = await fetch(`/events?date=${date}`);
+        const events = await res.json();
+        const list = document.getElementById('events');
+        list.innerHTML = "";
+        events.forEach(e => {
+          const li = document.createElement('li');
+          li.innerText = e.description;
+          list.appendChild(li);
+        });
+      } catch (err) {
+        console.error(err);
+      }
     }
 
+    // Automatically load events when date changes
+    document.getElementById('date').addEventListener('change', (e) => {
+      loadEvents(e.target.value);
+    });
+
+    // Initial load
     loadWeather();
   </script>
 </body>
