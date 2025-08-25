@@ -1,129 +1,108 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Weather & Calendar Dashboard</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 30px;
-      background-color: #f0f2f5;
-    }
-    h1 {
-      color: #333;
-    }
-    #weather {
-      padding: 10px;
-      background-color: #fff;
-      border-radius: 8px;
-      width: 300px;
-      margin-bottom: 20px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    #calendar {
-      padding: 10px;
-      background-color: #fff;
-      border-radius: 8px;
-      width: 400px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    input, button {
-      padding: 8px;
-      margin: 5px 0;
-      border-radius: 4px;
-      border: 1px solid #ccc;
-    }
-    button {
-      cursor: pointer;
-      background-color: #0078D4;
-      color: white;
-      border: none;
-    }
-    ul {
-      list-style: none;
-      padding-left: 0;
-    }
-    li {
-      background: #e0e0e0;
-      padding: 5px 10px;
-      border-radius: 4px;
-      margin-bottom: 5px;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Smart Home Dashboard</title>
+<style>
+body{font-family:Arial,sans-serif;margin:20px;background:#f0f2f5;}
+h1,h2{color:#333;}
+section{background:#fff;padding:15px;margin-bottom:20px;border-radius:8px;box-shadow:0 2px 5px rgba(0,0,0,0.1);}
+ul{list-style:none;padding-left:0;}
+li{padding:5px 0;border-bottom:1px solid #eee;}
+button{margin-left:10px;}
+</style>
 </head>
 <body>
-  <h1>Weather Dashboard</h1>
-  <div id="weather">Loading weather...</div>
+<h1>Smart Home Dashboard</h1>
 
-  <h1>Calendar Events</h1>
-  <div id="calendar">
-    <input type="date" id="date" />
-    <input type="text" id="desc" placeholder="Event description"/>
-    <button onclick="addEvent()">Add Event</button>
-    <ul id="events"></ul>
-  </div>
+<section>
+<h2>Weekly Weather (Budapest)</h2>
+<table border="1" id="weekly-weather">
+<tr><th>Date</th><th>Avg Temp (°C)</th><th>Rain Chance (%)</th></tr>
+</table>
+</section>
 
-  <script>
-    // Load weather data from Python backend
-    async function loadWeather() {
-      try {
-        const res = await fetch('/weather');
-        const data = await res.json();
-        document.getElementById('weather').innerText =
-          `${data.name}: ${data.temp}°C, ${data.description}`;
-      } catch (err) {
-        document.getElementById('weather').innerText = "Failed to load weather.";
-        console.error(err);
-      }
-    }
+<section>
+<h2>Upcoming Events (Next 4 Weeks)</h2>
+<ul id="upcoming-events"></ul>
+<input type="date" id="event-date">
+<input type="text" id="event-desc" placeholder="Description">
+<button onclick="addEvent()">Add Event</button>
+</section>
 
-    // Add new calendar event
-    async function addEvent() {
-      const date = document.getElementById('date').value;
-      const desc = document.getElementById('desc').value.trim();
-      if (!date || !desc) {
-        alert("Please select a date and enter a description.");
-        return;
-      }
-      try {
-        await fetch('/addEvent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: date, description: desc })
-        });
-        document.getElementById('desc').value = "";
-        loadEvents(date);
-      } catch (err) {
-        console.error(err);
-        alert("Failed to add event.");
-      }
-    }
+<section>
+<h2>Grocery List</h2>
+<ul id="grocery-list"></ul>
+<input id="item-name" placeholder="Item">
+<input id="item-qty" placeholder="Quantity">
+<button onclick="addItem()">Add</button>
+</section>
 
-    // Load events for a specific date
-    async function loadEvents(date) {
-      if (!date) return;
-      try {
-        const res = await fetch(`/events?date=${date}`);
-        const events = await res.json();
-        const list = document.getElementById('events');
-        list.innerHTML = "";
-        events.forEach(e => {
-          const li = document.createElement('li');
-          li.innerText = e.description;
-          list.appendChild(li);
-        });
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    // Automatically load events when date changes
-    document.getElementById('date').addEventListener('change', (e) => {
-      loadEvents(e.target.value);
+<script>
+// --- Weather ---
+async function loadWeeklyWeather(){
+    const res = await fetch('/weeklyWeather');
+    const week = await res.json();
+    const table = document.getElementById('weekly-weather');
+    week.forEach(d=>{
+        const row = table.insertRow();
+        row.insertCell(0).innerText=d.date;
+        row.insertCell(1).innerText=d.temp_avg;
+        row.insertCell(2).innerText=d.rain_chance;
     });
+}
+loadWeeklyWeather();
 
-    // Initial load
-    loadWeather();
-  </script>
+// --- Calendar ---
+async function loadUpcomingEvents(){
+    const res = await fetch('/upcomingEvents');
+    const events = await res.json();
+    const list=document.getElementById('upcoming-events');
+    list.innerHTML="";
+    events.forEach(e=>{
+        const li=document.createElement('li');
+        li.innerHTML=`${e.date}: ${e.description} <button onclick="deleteEvent('${e.id}')">Delete</button>`;
+        list.appendChild(li);
+    });
+}
+async function addEvent(){
+    const date=document.getElementById('event-date').value;
+    const desc=document.getElementById('event-desc').value;
+    if(!date||!desc){alert("Fill both fields"); return;}
+    await fetch('/addEvent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:date,description:desc})});
+    document.getElementById('event-desc').value="";
+    loadUpcomingEvents();
+}
+async function deleteEvent(id){
+    await fetch(`/deleteEvent/${id}`,{method:'DELETE'});
+    loadUpcomingEvents();
+}
+loadUpcomingEvents();
+
+// --- Grocery List ---
+async function loadItems(){
+    const res=await fetch('/items');
+    const items=await res.json();
+    const list=document.getElementById('grocery-list');
+    list.innerHTML="";
+    items.forEach(i=>{
+        const li=document.createElement('li');
+        li.innerHTML=`<input type="checkbox" ${i.checked?'checked':''} onclick="toggleItem('${i.id}')"> ${i.name} (${i.quantity}) <button onclick="deleteItem('${i.id}')">Delete</button>`;
+        list.appendChild(li);
+    });
+}
+async function addItem(){
+    const name=document.getElementById('item-name').value;
+    const qty=document.getElementById('item-qty').value;
+    if(!name||!qty){alert("Fill both fields"); return;}
+    await fetch('/addItem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,quantity:qty})});
+    document.getElementById('item-name').value="";
+    document.getElementById('item-qty').value="";
+    loadItems();
+}
+async function deleteItem(id){await fetch(`/deleteItem/${id}`,{method:'DELETE'}); loadItems();}
+async function toggleItem(id){await fetch(`/toggleItem/${id}`,{method:'POST'}); loadItems();}
+loadItems();
+</script>
 </body>
 </html>
