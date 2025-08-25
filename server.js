@@ -5,14 +5,14 @@ const { CosmosClient } = require("@azure/cosmos");
 const app = express();
 app.use(express.json());
 
-const WEATHER_API_KEY = "YOUR_OPENWEATHER_API_KEY";
-const CITY = "London";
+const WEATHER_API_KEY = "0dc56c73b23058eb4f000e8aca70267b";
+const CITY = "Hungary";
 
-const endpoint = "YOUR_COSMOS_DB_ENDPOINT";
-const key = "YOUR_COSMOS_DB_KEY";
+const endpoint = "https://smarthome123.documents.azure.com:443/";
+const key = "HCsbAKEvZe4KVcg94dylaMJazC3vb2vnzFlFHF8W1SsAJerM6CqSwl1WeGTbpNovR7Y39dFlrpiXACDbqH12Mw==";
 const client = new CosmosClient({ endpoint, key });
-const database = client.database("WeatherCalendarDB");
-const container = database.container("Events");
+const database = client.database("SmartHome");
+const container = database.container("HomeContainer");
 
 // Weather endpoint
 app.get("/weather", async (req, res) => {
