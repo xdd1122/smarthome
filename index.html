@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Weather & Calendar Dashboard</title>
+</head>
+<body>
+  <h1>Weather Dashboard</h1>
+  <div id="weather"></div>
+
+  <h1>Calendar Events</h1>
+  <input type="date" id="date" />
+  <input type="text" id="desc" placeholder="Event description"/>
+  <button onclick="addEvent()">Add Event</button>
+  <ul id="events"></ul>
+
+  <script>
+    async function loadWeather() {
+      const res = await fetch('/weather');
+      const data = await res.json();
+      document.getElementById('weather').innerText =
+        `${data.name}: ${data.main.temp}°C, ${data.weather[0].description}`;
+    }
+
+    async function addEvent() {
+      const date = document.getElementById('date').value;
+      const desc = document.getElementById('desc').value;
+      await fetch('/addEvent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, description: desc })
+      });
+      loadEvents(date);
+    }
+
+    async function loadEvents(date) {
+      const res = await fetch(`/events?date=${date}`);
+      const events = await res.json();
+      const list = document.getElementById('events');
+      list.innerHTML = "";
+      events.forEach(e => {
+        const li = document.createElement('li');
+        li.innerText = e.description;
+        list.appendChild(li);
+      });
+    }
+
+    loadWeather();
+  </script>
+</body>
+</html>
