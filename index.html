@@ -44,6 +44,7 @@ async function loadWeeklyWeather(){
     const res = await fetch('/weeklyWeather');
     const week = await res.json();
     const table = document.getElementById('weekly-weather');
+    table.innerHTML = "<tr><th>Date</th><th>Avg Temp (°C)</th><th>Rain Chance (%)</th></tr>";
     week.forEach(d=>{
         const row = table.insertRow();
         row.insertCell(0).innerText=d.date;
