@@ -10,7 +10,6 @@ app = Flask(__name__, static_folder='')
 
 # Weather API (Budapest)
 WEATHER_API_KEY = "0dc56c73b23058eb4f000e8aca70267b"
-CITY = "Budapest"
 LAT = 47.4979   # Budapest latitude
 LON = 19.0402   # Budapest longitude
 
@@ -39,11 +38,11 @@ def weekly_weather():
         url = f"https://api.openweathermap.org/data/2.5/onecall?lat={LAT}&lon={LON}&exclude=current,minutely,hourly,alerts&units=metric&appid={WEATHER_API_KEY}"
         data = requests.get(url).json()
         weekly = []
-        for day in data['daily']:
+        for day in data.get('daily', []):
             weekly.append({
                 "date": datetime.utcfromtimestamp(day['dt']).strftime('%Y-%m-%d'),
                 "temp_avg": day['temp']['day'],
-                "rain_chance": day.get('pop',0)*100
+                "rain_chance": day.get('pop', 0) * 100
             })
         return jsonify(weekly)
     except Exception as e:
