@@ -54,7 +54,7 @@ def upcoming_events():
     try:
         today = datetime.utcnow().date()
         four_weeks = today + timedelta(weeks=4)
-        query = f"SELECT * FROM c WHERE c.date >= '{today}' AND c.date <= '{four_weeks}'"
+        query = f"SELECT * FROM c WHERE c.type = 'event' AND c.date >= '{today}' AND c.date <= '{four_weeks}'"
         items = list(container.query_items(query=query, enable_cross_partition_query=True))
         return jsonify(items)
     except Exception as e:
@@ -65,6 +65,8 @@ def add_event():
     try:
         body = request.json
         body['id'] = str(uuid.uuid4())
+        body['type'] = "event"
+        body['partitionKey'] = "event"   # ✅ stable partition key
         container.create_item(body)
         return jsonify(body)
     except Exception as e:
@@ -73,7 +75,7 @@ def add_event():
 @app.route("/deleteEvent/<event_id>", methods=["DELETE"])
 def delete_event(event_id):
     try:
-        container.delete_item(event_id, partition_key=event_id)
+        container.delete_item(event_id, partition_key="event")  # ✅ matches partition key
         return jsonify({"status": "deleted"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -82,7 +84,8 @@ def delete_event(event_id):
 @app.route("/items")
 def get_items():
     try:
-        items = list(container.read_all_items())
+        query = "SELECT * FROM c WHERE c.type = 'item'"
+        items = list(container.query_items(query=query, enable_cross_partition_query=True))
         return jsonify(items)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -92,6 +95,8 @@ def add_item():
     try:
         body = request.json
         body['id'] = str(uuid.uuid4())
+        body['type'] = "item"
+        body['partitionKey'] = "item"   # ✅ stable partition key
         body['checked'] = False
         container.create_item(body)
         return jsonify(body)
@@ -101,7 +106,7 @@ def add_item():
 @app.route("/deleteItem/<item_id>", methods=["DELETE"])
 def delete_item(item_id):
     try:
-        container.delete_item(item_id, partition_key=item_id)
+        container.delete_item(item_id, partition_key="item")  # ✅ matches partition key
         return jsonify({"status": "deleted"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -109,9 +114,9 @@ def delete_item(item_id):
 @app.route("/toggleItem/<item_id>", methods=["POST"])
 def toggle_item(item_id):
     try:
-        item = container.read_item(item_id, partition_key=item_id)
+        item = container.read_item(item_id, partition_key="item")  # ✅ correct partition key
         item["checked"] = not item.get("checked", False)
-        container.replace_item(item, item)
+        container.replace_item(item=item_id, body=item)
         return jsonify(item)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
