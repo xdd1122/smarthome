@@ -66,7 +66,7 @@ def add_event():
         body = request.json
         body['id'] = str(uuid.uuid4())
         body['type'] = "event"
-        body['partitionKey'] = "event"   # ✅ stable partition key
+        body['partitionKey'] = "event"   # 🔑 REQUIRED for deletes to work
         container.create_item(body)
         return jsonify(body)
     except Exception as e:
@@ -75,10 +75,12 @@ def add_event():
 @app.route("/deleteEvent/<event_id>", methods=["DELETE"])
 def delete_event(event_id):
     try:
-        container.delete_item(event_id, partition_key="event")  # ✅ matches partition key
+        # 🔑 Must pass the same partitionKey used when adding
+        container.delete_item(event_id, partition_key="event")
         return jsonify({"status": "deleted"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 # --- Grocery List ---
 @app.route("/items")
