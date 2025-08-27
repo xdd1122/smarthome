@@ -1,8 +1,6 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, jsonify, send_from_directory
 import requests
-from azure.cosmos import CosmosClient
 from datetime import datetime, timedelta
-import uuid
 import os
 
 # --- Configuration ---
@@ -12,17 +10,6 @@ app = Flask(__name__, static_folder='')
 WEATHER_API_KEY = "0dc56c73b23058eb4f000e8aca70267b"
 LAT = 47.4979   # Budapest latitude
 LON = 19.0402   # Budapest longitude
-
-# Cosmos DB
-COSMOS_ENDPOINT = "https://smarthome123.documents.azure.com:443/"
-COSMOS_KEY = "HCsbAKEvZe4KVcg94dylaMJazC3vb2vnzFlFHF8W1SsAJerM6CqSwl1WeGTbpNovR7Y39dFlrpiXACDbqH12Mw=="
-DATABASE_NAME = "SmartHome"
-CONTAINER_NAME = "HomeContainer"
-
-# Initialize Cosmos client
-client = CosmosClient(COSMOS_ENDPOINT, COSMOS_KEY)
-database = client.get_database_client(DATABASE_NAME)
-container = database.get_container_client(CONTAINER_NAME)
 
 # --- Routes ---
 
@@ -35,91 +22,29 @@ def index():
 @app.route("/weeklyWeather")
 def weekly_weather():
     try:
-        url = f"https://api.openweathermap.org/data/2.5/onecall?lat={LAT}&lon={LON}&exclude=current,minutely,hourly,alerts&units=metric&appid={WEATHER_API_KEY}"
+        url = (
+            f"https://api.openweathermap.org/data/2.5/onecall"
+            f"?lat={LAT}&lon={LON}&exclude=current,minutely,hourly,alerts"
+            f"&units=metric&appid={WEATHER_API_KEY}"
+        )
         data = requests.get(url).json()
-        weekly = []
-        for day in data.get('daily', []):
-            weekly.append({
-                "date": datetime.utcfromtimestamp(day['dt']).strftime('%Y-%m-%d'),
-                "temp_avg": day['temp']['day'],
-                "rain_chance": day.get('pop', 0) * 100
-            })
-        return jsonify(weekly)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
-# --- Calendar ---
-@app.route("/upcomingEvents")
-def upcoming_events():
-    try:
+        # Find Monday of this week (UTC)
         today = datetime.utcnow().date()
-        four_weeks = today + timedelta(weeks=4)
-        query = f"SELECT * FROM c WHERE c.type = 'event' AND c.date >= '{today}' AND c.date <= '{four_weeks}'"
-        items = list(container.query_items(query=query, enable_cross_partition_query=True))
-        return jsonify(items)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        monday = today - timedelta(days=today.weekday())  # 0 = Monday
+        friday = monday + timedelta(days=4)
 
-@app.route("/addEvent", methods=["POST"])
-def add_event():
-    try:
-        body = request.json
-        body['id'] = str(uuid.uuid4())
-        body['type'] = "event"
-        body['partitionKey'] = "event"   # 🔑 REQUIRED for deletes to work
-        container.create_item(body)
-        return jsonify(body)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        weekdays = []
+        for day in data.get("daily", []):
+            date = datetime.utcfromtimestamp(day["dt"]).date()
+            if monday <= date <= friday:
+                weekdays.append({
+                    "date": date.strftime("%Y-%m-%d"),
+                    "temp_avg": round(day["temp"]["day"], 1),
+                    "rain_chance": round(day.get("pop", 0) * 100, 1)
+                })
 
-@app.route("/deleteEvent/<event_id>", methods=["DELETE"])
-def delete_event(event_id):
-    try:
-        # 🔑 Must pass the same partitionKey used when adding
-        container.delete_item(event_id, partition_key="event")
-        return jsonify({"status": "deleted"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-# --- Grocery List ---
-@app.route("/items")
-def get_items():
-    try:
-        query = "SELECT * FROM c WHERE c.type = 'item'"
-        items = list(container.query_items(query=query, enable_cross_partition_query=True))
-        return jsonify(items)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/addItem", methods=["POST"])
-def add_item():
-    try:
-        body = request.json
-        body['id'] = str(uuid.uuid4())
-        body['type'] = "item"
-        body['partitionKey'] = "item"   # ✅ stable partition key
-        body['checked'] = False
-        container.create_item(body)
-        return jsonify(body)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/deleteItem/<item_id>", methods=["DELETE"])
-def delete_item(item_id):
-    try:
-        container.delete_item(item_id, partition_key="item")  # ✅ matches partition key
-        return jsonify({"status": "deleted"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/toggleItem/<item_id>", methods=["POST"])
-def toggle_item(item_id):
-    try:
-        item = container.read_item(item_id, partition_key="item")  # ✅ correct partition key
-        item["checked"] = not item.get("checked", False)
-        container.replace_item(item=item_id, body=item)
-        return jsonify(item)
+        return jsonify(weekdays)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
