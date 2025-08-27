@@ -1,102 +1,54 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Smart Home Dashboard</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-    }
-    h2 {
-      margin-top: 30px;
-    }
-    ul {
-      list-style-type: none;
-      padding: 0;
-    }
-    li {
-      margin: 8px 0;
-      padding: 6px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    button {
-      margin-left: 10px;
-      cursor: pointer;
-    }
-  </style>
-</head>
-<body>
-  <h1>Smart Home Dashboard</h1>
+from flask import Flask, jsonify, send_from_directory
+import requests
+from datetime import datetime, timedelta
+import os
 
-  <!-- 📅 Calendar Section -->
-  <h2>Upcoming Events</h2>
-  <div>
-    <input id="eventTitle" placeholder="Event title">
-    <input id="eventDate" type="date">
-    <button onclick="addEvent()">Add Event</button>
-  </div>
-  <ul id="events"></ul>
+# --- Configuration ---
+app = Flask(__name__, static_folder='')
 
-  <script>
-    // Load all upcoming events
-    async function loadEvents() {
-      try {
-        const res = await fetch("/upcomingEvents");
-        const events = await res.json();
-        const list = document.getElementById("events");
-        list.innerHTML = "";
+# Weather API (Budapest)
+WEATHER_API_KEY = "0dc56c73b23058eb4f000e8aca70267b"
+LAT = 47.4979   # Budapest latitude
+LON = 19.0402   # Budapest longitude
 
-        if (!Array.isArray(events) || events.length === 0) {
-          list.innerHTML = "<li>No upcoming events.</li>";
-          return;
-        }
+# --- Routes ---
 
-        events.forEach(ev => {
-          const li = document.createElement("li");
-          li.textContent = `${ev.title} (${ev.date})`;
+# Serve index.html
+@app.route("/")
+def index():
+    return send_from_directory("", "index.html")
 
-          const delBtn = document.createElement("button");
-          delBtn.textContent = "Delete";
-          delBtn.onclick = async () => {
-            await fetch(`/deleteEvent/${ev.id}`, { method: "DELETE" });
-            loadEvents();
-          };
+# --- Weather ---
+@app.route("/weeklyWeather")
+def weekly_weather():
+    try:
+        url = (
+            f"https://api.openweathermap.org/data/2.5/onecall"
+            f"?lat={LAT}&lon={LON}&exclude=current,minutely,hourly,alerts"
+            f"&units=metric&appid={WEATHER_API_KEY}"
+        )
+        data = requests.get(url).json()
 
-          li.appendChild(delBtn);
-          list.appendChild(li);
-        });
-      } catch (err) {
-        console.error("Error loading events:", err);
-      }
-    }
+        # Find Monday of this week (UTC)
+        today = datetime.utcnow().date()
+        monday = today - timedelta(days=today.weekday())  # 0 = Monday
+        friday = monday + timedelta(days=4)
 
-    // Add a new event
-    async function addEvent() {
-      const title = document.getElementById("eventTitle").value;
-      const date = document.getElementById("eventDate").value;
-      if (!title || !date) {
-        alert("Please enter both title and date.");
-        return;
-      }
+        weekdays = []
+        for day in data.get("daily", []):
+            date = datetime.utcfromtimestamp(day["dt"]).date()
+            if monday <= date <= friday:
+                weekdays.append({
+                    "date": date.strftime("%Y-%m-%d"),
+                    "temp_avg": round(day["temp"]["day"], 1),
+                    "rain_chance": round(day.get("pop", 0) * 100, 1)
+                })
 
-      await fetch("/addEvent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, date })
-      });
+        return jsonify(weekdays)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-      document.getElementById("eventTitle").value = "";
-      document.getElementById("eventDate").value = "";
-      loadEvents();
-    }
-
-    // Load events on page load
-    window.onload = loadEvents;
-  </script>
-</body>
-</html>
+# --- Run App ---
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port)
