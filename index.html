@@ -1,54 +1,50 @@
-from flask import Flask, jsonify, send_from_directory
-import requests
-from datetime import datetime, timedelta
-import os
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Weather This Week</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    table { border-collapse: collapse; width: 60%; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>Weather Forecast (Mon–Fri)</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Avg Temp (°C)</th>
+        <th>Rain Chance (%)</th>
+      </tr>
+    </thead>
+    <tbody id="weather"></tbody>
+  </table>
 
-# --- Configuration ---
-app = Flask(__name__, static_folder='')
+  <script>
+    async function loadWeather() {
+      const res = await fetch("/weeklyWeather");
+      const data = await res.json();
+      const tbody = document.getElementById("weather");
+      tbody.innerHTML = "";
 
-# Weather API (Budapest)
-WEATHER_API_KEY = "0dc56c73b23058eb4f000e8aca70267b"
-LAT = 47.4979   # Budapest latitude
-LON = 19.0402   # Budapest longitude
+      if (!Array.isArray(data) || data.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='3'>No data available</td></tr>";
+        return;
+      }
 
-# --- Routes ---
+      data.forEach(day => {
+        const row = `<tr>
+          <td>${day.date}</td>
+          <td>${day.temp_avg}</td>
+          <td>${day.rain_chance}</td>
+        </tr>`;
+        tbody.innerHTML += row;
+      });
+    }
 
-# Serve index.html
-@app.route("/")
-def index():
-    return send_from_directory("", "index.html")
-
-# --- Weather ---
-@app.route("/weeklyWeather")
-def weekly_weather():
-    try:
-        url = (
-            f"https://api.openweathermap.org/data/2.5/onecall"
-            f"?lat={LAT}&lon={LON}&exclude=current,minutely,hourly,alerts"
-            f"&units=metric&appid={WEATHER_API_KEY}"
-        )
-        data = requests.get(url).json()
-
-        # Find Monday of this week (UTC)
-        today = datetime.utcnow().date()
-        monday = today - timedelta(days=today.weekday())  # 0 = Monday
-        friday = monday + timedelta(days=4)
-
-        weekdays = []
-        for day in data.get("daily", []):
-            date = datetime.utcfromtimestamp(day["dt"]).date()
-            if monday <= date <= friday:
-                weekdays.append({
-                    "date": date.strftime("%Y-%m-%d"),
-                    "temp_avg": round(day["temp"]["day"], 1),
-                    "rain_chance": round(day.get("pop", 0) * 100, 1)
-                })
-
-        return jsonify(weekdays)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# --- Run App ---
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    app.run(host="0.0.0.0", port=port)
+    window.onload = loadWeather;
+  </script>
+</body>
+</html>
