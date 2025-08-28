@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout the repo
+      # 1️⃣ Checkout repo
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -26,15 +26,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4️⃣ Log in to Azure using Service Principal
+      # 4️⃣ Login to Azure using Service Principal
       - name: Azure Login
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 5️⃣ Deploy to Azure Web App
+      # 5️⃣ Deploy to Azure Web App (Production slot)
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2
         with:
-          app-name: "SmartHome"              # Your Web App name
-          package: ./                        # Deploy from repo root
+          app-name: "smarthome"      # Your Web App name
+          package: ./                # Deploy from repo root
+          # ✅ Do NOT include slot-name; defaults to production
