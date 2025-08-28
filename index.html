@@ -2,49 +2,80 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Weather This Week</title>
+  <title>Smart Home Calendar</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
-    table { border-collapse: collapse; width: 60%; }
+    table { border-collapse: collapse; width: 70%; margin-top: 20px; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    button { padding: 5px 10px; margin: 2px; }
   </style>
 </head>
 <body>
-  <h1>Weather Forecast (Mon–Fri)</h1>
+  <h1>Upcoming Events</h1>
+
+  <form id="eventForm">
+    <input type="text" id="title" placeholder="Event Title" required>
+    <input type="date" id="date" required>
+    <button type="submit">Add Event</button>
+  </form>
+
   <table>
     <thead>
       <tr>
+        <th>Title</th>
         <th>Date</th>
-        <th>Avg Temp (°C)</th>
-        <th>Rain Chance (%)</th>
+        <th>Action</th>
       </tr>
     </thead>
-    <tbody id="weather"></tbody>
+    <tbody id="events"></tbody>
   </table>
 
   <script>
-    async function loadWeather() {
-      const res = await fetch("/weeklyWeather");
-      const data = await res.json();
-      const tbody = document.getElementById("weather");
+    async function loadEvents() {
+      const res = await fetch("/upcomingEvents");
+      const events = await res.json();
+      const tbody = document.getElementById("events");
       tbody.innerHTML = "";
 
-      if (!Array.isArray(data) || data.length === 0) {
-        tbody.innerHTML = "<tr><td colspan='3'>No data available</td></tr>";
+      if (!Array.isArray(events) || events.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='3'>No events</td></tr>";
         return;
       }
 
-      data.forEach(day => {
-        const row = `<tr>
-          <td>${day.date}</td>
-          <td>${day.temp_avg}</td>
-          <td>${day.rain_chance}</td>
-        </tr>`;
-        tbody.innerHTML += row;
+      events.forEach(ev => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${ev.title || "Untitled"}</td>
+          <td>${ev.date}</td>
+          <td><button onclick="deleteEvent('${ev.id}')">Delete</button></td>
+        `;
+        tbody.appendChild(row);
       });
     }
 
-    window.onload = loadWeather;
+    async function addEvent(e) {
+      e.preventDefault();
+      const title = document.getElementById("title").value;
+      const date = document.getElementById("date").value;
+
+      await fetch("/addEvent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, date })
+      });
+
+      document.getElementById("eventForm").reset();
+      loadEvents();
+    }
+
+    async function deleteEvent(id) {
+      await fetch(`/deleteEvent/${id}`, { method: "DELETE" });
+      loadEvents();
+    }
+
+    document.getElementById("eventForm").addEventListener("submit", addEvent);
+
+    window.onload = loadEvents;
   </script>
 </body>
 </html>
